@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ma Liste d'Épicerie</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:700px;margin:auto;padding:15px}
+input,select,button{padding:8px;margin:4px}
+li{margin:6px 0}
+.done{text-decoration:line-through;color:#777}
+</style>
+</head>
+<body>
+<h2>Liste d'épicerie</h2>
+
+<select id="liste"></select>
+<button onclick="ajouterListe()">Nouvelle liste</button>
+
+<div>
+<input id="item" placeholder="Article">
+<input id="qty" type="number" value="1" min="1" style="width:70px">
+<button onclick="ajouterItem()">Ajouter</button>
+</div>
+
+<h3>Favoris</h3>
+<div id="favoris"></div>
+
+<h3>Articles</h3>
+<ul id="items"></ul>
+
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbxmP7VIUulXWsYoec9dNUhYPKZ8GA-rWFC_goIV_tKc7v22ifmyDqPX9KqIs943GE8leg/exec";
+let data={};
+
+function sauvegarder(){fetch(API_URL,{method:'POST',body:JSON.stringify(data)});}
+async function charger(){
+ const r=await fetch(API_URL);
+ data=await r.json();
+ if(!Object.keys(data).length) data={"Épicerie":[]};
+ majListes();
+}
+function majListes(){
+ const s=document.getElementById('liste');
+ s.innerHTML='';
+ Object.keys(data).forEach(n=>{
+  let o=document.createElement('option');o.text=n;s.add(o);
+ });
+ afficher();
+}
+function ajouterListe(){
+ let n=prompt("Nom de la liste");
+ if(!n) return;
+ data[n]=[]; majListes(); sauvegarder();
+}
+function afficher(){
+ let nom=document.getElementById('liste').value;
+ let ul=document.getElementById('items'); ul.innerHTML='';
+ let favs=new Set();
+ (data[nom]||[]).forEach((it,i)=>{
+   let li=document.createElement('li');
+   li.className=it.done?'done':'';
+   li.innerHTML=`<input type="checkbox" ${it.done?'checked':''}
+   onchange="toggle(${i})"> ${it.nom} (${it.qty})
+   <button onclick="favori(${i})">★</button>`;
+   ul.appendChild(li);
+   if(it.fav) favs.add(it.nom);
+ });
+ let f=document.getElementById('favoris'); f.innerHTML='';
+ [...favs].forEach(n=>{
+   let b=document.createElement('button');
+   b.textContent=n;
+   b.onclick=()=>{document.getElementById('item').value=n};
+   f.appendChild(b);
+ });
+}
+function ajouterItem(){
+ let nomListe=document.getElementById('liste').value;
+ data[nomListe].push({
+  nom:document.getElementById('item').value,
+  qty:document.getElementById('qty').value,
+  done:false,fav:false
+ });
+ afficher(); sauvegarder();
+}
+function toggle(i){
+ let l=document.getElementById('liste').value;
+ data[l][i].done=!data[l][i].done;
+ afficher(); sauvegarder();
+}
+function favori(i){
+ let l=document.getElementById('liste').value;
+ data[l][i].fav=!data[l][i].fav;
+ afficher(); sauvegarder();
+}
+charger();
+</script>
+</body>
+</html>
