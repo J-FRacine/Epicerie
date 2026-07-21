@@ -21,26 +21,42 @@ st.set_page_config(layout="wide")
 st.markdown("""
 <style>
 .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-input, select, textarea { font-size: 16px !important; }
+
+/* Champs plus lisibles sur mobile */
+input, select, textarea {
+    font-size: 16px !important;
+}
+
+/* Boutons larges */
 .stButton>button {
     width: 100%;
     border-radius: 10px;
     padding: 0.6rem 1rem;
     font-size: 16px;
 }
+
+/* Cartes d’items */
 .item-card {
     padding: 0.6rem 0.8rem;
     background-color: #1e1e1e;
     border-radius: 10px;
     margin-bottom: 0.6rem;
 }
+
+/* Nom de l’item */
 .item-name {
     font-size: 18px;
     font-weight: 600;
 }
-.delete-btn {
-    font-size: 22px;
-    color: #ff4b4b;
+
+/* Icônes */
+.icon-green {
+    color: #4CAF50;
+    font-size: 24px;
+}
+.icon-red {
+    color: #FF4B4B;
+    font-size: 24px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -103,11 +119,13 @@ colA, colB = st.columns([3, 1])
 with colA:
     item_name = st.text_input("Nom de l'item", key="item_name")
 
+needed_flag = st.checkbox("J’en ai besoin", value=False)
+
 with colB:
     add_btn = st.button("Ajouter")
 
 if add_btn and item_name.strip():
-    add_item(item_name.strip(), selected_category_id, 0, user_id)
+    add_item(item_name.strip(), selected_category_id, 1 if needed_flag else 0, user_id)
     st.rerun()
 
 # -------------------------------------------------
@@ -130,7 +148,7 @@ else:
 for item_id, name, category, needed in all_items:
     st.markdown('<div class="item-card">', unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([4, 3, 1])
+    col1, col2, col3, col4 = st.columns([3, 3, 2, 1])
 
     # Nom
     with col1:
@@ -149,8 +167,21 @@ for item_id, name, category, needed in all_items:
             update_item_category(item_id, new_cat_id)
             st.rerun()
 
-    # Supprimer
+    # Besoin / Pas besoin
     with col3:
+        if needed:
+            if st.button("✓", key=f"need_{item_id}"):
+                toggle_needed(item_id)
+                st.rerun()
+            st.markdown('<span class="icon-green">✓</span>', unsafe_allow_html=True)
+        else:
+            if st.button("✗", key=f"need_{item_id}"):
+                toggle_needed(item_id)
+                st.rerun()
+            st.markdown('<span class="icon-red">✗</span>', unsafe_allow_html=True)
+
+    # Supprimer
+    with col4:
         if st.button("🗑️", key=f"del_{item_id}"):
             delete_item(item_id)
             st.rerun()
