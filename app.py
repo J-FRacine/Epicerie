@@ -1,3 +1,4 @@
+st.set_page_config(page_title="Liste d’achats", page_icon="🛒")
 import streamlit as st
 from database import (
     init_db,
