@@ -1,3 +1,23 @@
+import sqlite3
+
+def ensure_user_id_column():
+    conn = sqlite3.connect("items.db")
+    cur = conn.cursor()
+
+    # Vérifier si la colonne existe
+    cur.execute("PRAGMA table_info(items)")
+    columns = [col[1] for col in cur.fetchall()]
+
+    if "user_id" not in columns:
+        cur.execute("ALTER TABLE items ADD COLUMN user_id INTEGER;")
+        cur.execute("UPDATE items SET user_id = 1;")
+        conn.commit()
+
+    conn.close()
+
+ensure_user_id_column()
+
+
 import streamlit as st
 
 st.set_page_config(page_title="Liste d’achats", page_icon="🛒")
