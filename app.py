@@ -52,16 +52,6 @@ input, select, textarea {
     font-weight: 600;
 }
 
-/* Icônes ✔️ et ❌ */
-.icon-green {
-    color: #4CAF50;
-    font-size: 26px;
-}
-.icon-red {
-    color: #FF4B4B;
-    font-size: 26px;
-}
-
 /* Barre d’onglets en bas */
 .bottom-nav {
     position: fixed;
@@ -278,33 +268,12 @@ elif current_tab == "besoins":
             for iid, name in items:
 
                 # ---- X À GAUCHE, NOM À DROITE ----
-                st.markdown(
-                    f"""
-                    <div style="
-                        display: flex;
-                        justify-content: flex-start;
-                        align-items: center;
-                        gap: 1rem;
-                        padding: 0.6rem 0;
-                    ">
-                        <form action="" method="post">
-                            <button style="
-                                background: none;
-                                border: none;
-                                color: #FF4B4B;
-                                font-size: 26px;
-                                cursor: pointer;
-                            " onclick="document.getElementById('btn_{iid}').click(); return false;">
-                                ❌
-                            </button>
-                        </form>
+                col_x, col_name = st.columns([1, 6])
 
-                        <span style="font-size: 18px; font-weight: 600;">{name}</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                with col_x:
+                    if st.button("❌", key=f"need_toggle_{iid}"):
+                        toggle_needed(iid)
+                        st.rerun()
 
-                if st.button("❌", key=f"btn_{iid}"):
-                    toggle_needed(iid)
-                    st.rerun()
+                with col_name:
+                    st.write(f"**{name}**")
