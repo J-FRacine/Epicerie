@@ -111,26 +111,20 @@ st.sidebar.header("Utilisateur")
 users = get_users()
 user_names = [u[1] for u in users]
 
-# Si aucun utilisateur, on en crée un par défaut
 if not users:
     add_user("Utilisateur 1")
     users = get_users()
     user_names = [u[1] for u in users]
 
 selected_user = st.sidebar.selectbox("Choisir un utilisateur", user_names)
-
-# Trouver son ID
 user_id = [u[0] for u in users if u[1] == selected_user][0]
 
-st.sidebar.write("Renommer l'utilisateur")
-new_name = st.sidebar.text_input("Nouveau nom", key="rename_user")
-
+new_name = st.sidebar.text_input("Renommer l'utilisateur")
 if st.sidebar.button("Renommer"):
     if new_name.strip():
         rename_user(user_id, new_name.strip())
         st.rerun()
 
-# Ajouter un utilisateur
 new_user = st.sidebar.text_input("Nouvel utilisateur")
 if st.sidebar.button("Créer utilisateur"):
     if new_user.strip():
@@ -144,7 +138,6 @@ tabs = {
     "categories": "📂 Catégories"
 }
 
-# Lecture de l’onglet courant via query params (fallback "items")
 try:
     current_tab = st.query_params.get("tab", "items")
 except Exception:
@@ -213,7 +206,6 @@ elif current_tab == "items":
     st.header("Tous les items")
     st.write("---")
 
-    # -------- TRI DES ITEMS --------
     tri_mode = st.selectbox(
         "Trier les items par",
         ["Alphabétique", "Ordre d’ajout", "Catégorie", "Besoin"]
@@ -228,7 +220,6 @@ elif current_tab == "items":
     elif tri_mode == "Besoin":
         all_items = sorted(all_items, key=lambda x: x[3], reverse=True)
 
-    # -------- AFFICHAGE DES ITEMS (MOBILE-FIRST) --------
     for iid, name, cat, needed in all_items:
         st.markdown('<div class="item-card">', unsafe_allow_html=True)
 
@@ -285,10 +276,35 @@ elif current_tab == "besoins":
                 items = sorted(items, key=lambda x: x[1])
 
             for iid, name in items:
-                c1, c2 = st.columns([6, 1])
-                with c1:
-                    st.write(f"**{name}**")
-                with c2:
-                    if st.button("❌", key=f"need_toggle_{iid}"):
-                        toggle_needed(iid)
-                        st.rerun()
+
+                # ---- X À GAUCHE, NOM À DROITE ----
+                st.markdown(
+                    f"""
+                    <div style="
+                        display: flex;
+                        justify-content: flex-start;
+                        align-items: center;
+                        gap: 1rem;
+                        padding: 0.6rem 0;
+                    ">
+                        <form action="" method="post">
+                            <button style="
+                                background: none;
+                                border: none;
+                                color: #FF4B4B;
+                                font-size: 26px;
+                                cursor: pointer;
+                            " onclick="document.getElementById('btn_{iid}').click(); return false;">
+                                ❌
+                            </button>
+                        </form>
+
+                        <span style="font-size: 18px; font-weight: 600;">{name}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                if st.button("❌", key=f"btn_{iid}"):
+                    toggle_needed(iid)
+                    st.rerun()
