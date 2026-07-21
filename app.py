@@ -57,7 +57,6 @@ elif page == "Gestion des items":
 
     st.header("Ajouter un item")
 
-    # Champ texte SANS key → value contrôlée par session_state
     item_name = st.text_input(
         "Nom de l’item",
         value=st.session_state.get("item_name", "")
@@ -69,10 +68,7 @@ elif page == "Gestion des items":
     if st.button("Ajouter item"):
         if item_name.strip():
             add_item(item_name, cat_dict[item_cat], 1 if item_needed else 0)
-
-            # Vider le champ proprement
             st.session_state["item_name"] = ""
-
             st.rerun()
 
     st.header("Tous les items")
@@ -81,7 +77,7 @@ elif page == "Gestion des items":
     # -------- TRI DES ITEMS --------
     tri_mode = st.selectbox(
         "Trier les items par",
-        ["Alphabétique", "Catégorie", "Besoin","Ordre d’ajout"]
+        ["Alphabétique", "Ordre d’ajout", "Catégorie", "Besoin"]
     )
 
     all_items = get_items(only_needed=False)
@@ -96,19 +92,20 @@ elif page == "Gestion des items":
     # -------- AFFICHAGE DES ITEMS --------
     for iid, name, cat, needed in all_items:
 
-        col1, col2, col3, col4, col5 = st.columns([5, 2, 2.5, 1, 1])
+        # Colonnes optimisées pour mobile
+        col1, col2, col3, col4 = st.columns([5, 2, 3, 1])
 
         # Nom
         with col1:
             st.write(f"**{name}**")
 
-        # Bouton Oui/Non (toggle direct)
+        # Bouton Oui/Non toggle
         with col2:
             if st.button("✔️" if needed else "❌", key=f"toggle_{iid}"):
                 toggle_needed(iid)
                 st.rerun()
 
-        # Catégorie (selectbox compact)
+        # Catégorie (selectbox avec valeur correcte)
         with col3:
             new_cat = st.selectbox(
                 "",
@@ -117,20 +114,13 @@ elif page == "Gestion des items":
                 key=f"cat_select_{iid}"
             )
 
-
-        # Bouton Changer catégorie
+        # Bouton supprimer
         with col4:
-            if st.button("📂", key=f"cat_update_{iid}"):
-                update_item_category(iid, cat_dict[new_cat])
-                st.rerun()
-
-        # Supprimer
-        with col5:
             if st.button("🗑️", key=f"del_{iid}"):
                 delete_item(iid)
                 st.rerun()
 
-        st.write("")  # lignes rapprochées
+        st.write("")
 
 # ----------------- BESOINS PAR CATEGORIE -----------------
 elif page == "Besoins par catégorie":
