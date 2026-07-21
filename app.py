@@ -10,10 +10,46 @@ from database import (
     get_items,
     delete_item,
     toggle_needed,
-    update_item_category
+    update_item_category,
+    add_user,
+    get_users,
+    rename_user
 )
 
 init_db()
+
+# ----------------- CHOIX D'UTILISATEUR -----------------
+st.sidebar.header("Utilisateur")
+
+users = get_users()
+user_names = [u[1] for u in users]
+
+# Si aucun utilisateur, on en crée un par défaut
+if not users:
+    add_user("Utilisateur 1")
+    users = get_users()
+    user_names = [u[1] for u in users]
+
+selected_user = st.sidebar.selectbox("Choisir un utilisateur", user_names)
+
+# Trouver son ID
+user_id = [u[0] for u in users if u[1] == selected_user][0]
+
+st.sidebar.write("Renommer l'utilisateur")
+new_name = st.sidebar.text_input("Nouveau nom", key="rename_user")
+
+if st.sidebar.button("Renommer"):
+    if new_name.strip():
+        rename_user(user_id, new_name.strip())
+        st.rerun()
+
+
+# Ajouter un utilisateur
+new_user = st.sidebar.text_input("Nouvel utilisateur")
+if st.sidebar.button("Créer utilisateur"):
+    if new_user.strip():
+        add_user(new_user.strip())
+        st.rerun()
 
 # ----------------- NAVIGATION -----------------
 page = st.sidebar.radio(
@@ -67,7 +103,7 @@ elif page == "Gestion des items":
 
     if st.button("Ajouter item"):
         if item_name.strip():
-            add_item(item_name, cat_dict[item_cat], 1 if item_needed else 0)
+            add_item(item_name, cat_dict[item_cat], 1 if item_needed else 0, user_id)
             st.session_state["item_name"] = ""
             st.rerun()
 
@@ -80,7 +116,7 @@ elif page == "Gestion des items":
         ["Alphabétique", "Ordre d’ajout", "Catégorie", "Besoin"]
     )
 
-    all_items = get_items(only_needed=False)
+    all_items = get_items(user_id, only_needed=False)
 
     if tri_mode == "Alphabétique":
         all_items = sorted(all_items, key=lambda x: x[1].lower())
@@ -92,20 +128,16 @@ elif page == "Gestion des items":
     # -------- AFFICHAGE DES ITEMS --------
     for iid, name, cat, needed in all_items:
 
-        # Colonnes optimisées pour mobile
         col1, col2, col3, col4 = st.columns([5, 2, 3, 1])
 
-        # Nom
         with col1:
             st.write(f"**{name}**")
 
-        # Bouton Oui/Non toggle
         with col2:
             if st.button("✔️" if needed else "❌", key=f"toggle_{iid}"):
                 toggle_needed(iid)
                 st.rerun()
 
-        # Catégorie (selectbox avec valeur correcte)
         with col3:
             new_cat = st.selectbox(
                 "",
@@ -114,7 +146,6 @@ elif page == "Gestion des items":
                 key=f"cat_select_{iid}"
             )
 
-        # Bouton supprimer
         with col4:
             if st.button("🗑️", key=f"del_{iid}"):
                 delete_item(iid)
@@ -131,7 +162,7 @@ elif page == "Besoins par catégorie":
         ["Alphabétique", "Ordre d’ajout"]
     )
 
-    needed_items = get_items(only_needed=True)
+    needed_items = get_items(user_id, only_needed=True)
 
     grouped = {}
     for iid, name, cat, needed in needed_items:
