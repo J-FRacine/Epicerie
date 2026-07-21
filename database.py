@@ -98,3 +98,35 @@ def update_item_category(item_id, new_category_id):
     cur.execute("UPDATE items SET category_id = ? WHERE id = ?", (new_category_id, item_id))
     conn.commit()
     conn.close()
+def init_db():
+    conn = sqlite3.connect("items.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            category_id INTEGER,
+            needed INTEGER,
+            user_id INTEGER,
+            FOREIGN KEY(category_id) REFERENCES categories(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    conn.commit()
+    conn.close()
