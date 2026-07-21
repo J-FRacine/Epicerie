@@ -130,3 +130,20 @@ def init_db():
 
     conn.commit()
     conn.close()
+    import sqlite3
+
+def add_user(name):
+    conn = sqlite3.connect("items.db")
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO users (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+
+def get_users():
+    conn = sqlite3.connect("items.db")
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM users ORDER BY name")
+    users = cur.fetchall()
+    conn.close()
+    return users
+
