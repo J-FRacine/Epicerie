@@ -1,5 +1,3 @@
-st.set_page_config(page_title="Liste d’achats")
-
 import streamlit as st
 from database import (
     init_db,
