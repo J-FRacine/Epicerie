@@ -234,7 +234,7 @@ def add_item_panel():
     cat_names = list(cat_dict.keys())
 
     item_name_input = ui.input('Nom de l’item')
-    item_cat_select = ui.select(cat_names, label='Catégorie')
+    item_cat_select = ui.select(cat_names, label='Catégorie').classes('w-48')
     item_needed_checkbox = ui.checkbox('J’en ai besoin')
 
     ui.button('Ajouter item', on_click=lambda: (
