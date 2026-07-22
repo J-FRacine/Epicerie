@@ -185,7 +185,7 @@ def user_panel():
             value=names_list[0],
             label='Choisir un utilisateur',
             on_change=on_user_change
-        )
+        ).classes('w-48')
 
         new_name_input = ui.input('Nouveau nom')
         ui.button('Renommer', on_click=lambda: (
