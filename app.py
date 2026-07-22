@@ -1,279 +1,384 @@
 import sqlite3
+import os
+from nicegui import ui
 
-def ensure_user_id_column():
-    conn = sqlite3.connect("items.db")
+# ---------- BASE DE DONNÉES (persistante dans GitHub) ----------
+DB_PATH = '/opt/render/project/src/items.db'
+
+def get_conn():
+    return sqlite3.connect(DB_PATH)
+
+def init_db():
+    # Ne recrée la base que si elle n'existe pas
+    if os.path.exists(DB_PATH):
+        return
+
+    conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("PRAGMA table_info(items)")
-    columns = [col[1] for col in cur.fetchall()]
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        )
+    ''')
 
-    if "user_id" not in columns:
-        cur.execute("ALTER TABLE items ADD COLUMN user_id INTEGER;")
-        cur.execute("UPDATE items SET user_id = 1;")
-        conn.commit()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        )
+    ''')
 
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category_id INTEGER,
+            needed INTEGER DEFAULT 0,
+            user_id INTEGER,
+            FOREIGN KEY(category_id) REFERENCES categories(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    ''')
+
+    conn.commit()
     conn.close()
-
-ensure_user_id_column()
-
-import streamlit as st
-
-st.set_page_config(page_title="Liste d’achats", page_icon="🛒", layout="wide")
-
-# ----------- STYLE MOBILE-FIRST + ONGLET EN BAS -----------
-st.markdown("""
-<style>
-.block-container { padding-top: 1rem; padding-bottom: 6rem; }
-
-/* Champs lisibles sur mobile */
-input, select, textarea {
-    font-size: 18px !important;
-}
-
-/* Boutons larges */
-.stButton>button {
-    width: 100%;
-    border-radius: 10px;
-    padding: 0.7rem 1rem;
-    font-size: 18px;
-}
-
-/* Cartes d’items */
-.item-card {
-    padding: 0.8rem;
-    background-color: #1e1e1e;
-    border-radius: 12px;
-    margin-bottom: 0.7rem;
-}
-
-/* Nom de l’item */
-.item-name {
-    font-size: 20px;
-    font-weight: 600;
-}
-
-/* Barre d’onglets en bas */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: #111;
-    padding: 0.6rem 0;
-    border-top: 1px solid #333;
-    display: flex;
-    justify-content: space-around;
-    z-index: 9999;
-}
-
-.bottom-nav a {
-    color: white;
-    text-decoration: none;
-    font-size: 16px;
-    text-align: center;
-}
-
-.bottom-nav a:hover {
-    color: #4CAF50;
-}
-</style>
-""", unsafe_allow_html=True)
-
-from database import (
-    init_db,
-    add_category,
-    get_categories,
-    add_item,
-    get_items,
-    delete_item,
-    toggle_needed,
-    update_item_category,
-    add_user,
-    get_users,
-    rename_user
-)
 
 init_db()
 
-# ----------------- CHOIX D'UTILISATEUR -----------------
-st.sidebar.header("Utilisateur")
+# ---------- ÉTAT GLOBAL ----------
+current_user_id = 1
+current_tab = 'items'
+tri_mode_items = 'Ordre d’ajout'
+tri_mode_needs = 'Ordre d’ajout'
 
-users = get_users()
-user_names = [u[1] for u in users]
+# États des panneaux repliables
+exp_user_open = False
+exp_cat_open = False
 
-if not users:
-    add_user("Utilisateur 1")
-    users = get_users()
-    user_names = [u[1] for u in users]
+# ---------- DB HELPERS ----------
+def get_users():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM users ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
-selected_user = st.sidebar.selectbox("Choisir un utilisateur", user_names)
-user_id = [u[0] for u in users if u[1] == selected_user][0]
+def add_user(name):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO users(name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
 
-new_name = st.sidebar.text_input("Renommer l'utilisateur")
-if st.sidebar.button("Renommer"):
-    if new_name.strip():
-        rename_user(user_id, new_name.strip())
-        st.rerun()
+def rename_user(user_id, new_name):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET name = ? WHERE id = ?", (new_name, user_id))
+    conn.commit()
+    conn.close()
 
-new_user = st.sidebar.text_input("Nouvel utilisateur")
-if st.sidebar.button("Créer utilisateur"):
-    if new_user.strip():
-        add_user(new_user.strip())
-        st.rerun()
+def get_categories():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name FROM categories ORDER BY name")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
-# ----------------- ONGLET EN BAS -----------------
-tabs = {
-    "items": "📝 Items",
-    "besoins": "❤️ Besoins",
-    "categories": "📂 Catégories"
-}
+def add_category(name):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO categories(name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
 
-try:
-    current_tab = st.query_params.get("tab", "items")
-except Exception:
-    current_tab = "items"
+def delete_category(cat_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM items WHERE category_id = ?", (cat_id,))
+    cur.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
+    conn.commit()
+    conn.close()
 
-st.markdown(
-    f"""
-    <div class="bottom-nav">
-        <a href="?tab=items">{tabs['items']}</a>
-        <a href="?tab=besoins">{tabs['besoins']}</a>
-        <a href="?tab=categories">{tabs['categories']}</a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+def add_item(name, category_id, needed, user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO items(name, category_id, needed, user_id) VALUES (?, ?, ?, ?)",
+        (name, category_id, needed, user_id)
+    )
+    conn.commit()
+    conn.close()
 
-categories = get_categories()
-cat_dict = {name: cid for cid, name in categories}
+def get_items(user_id, only_needed=False):
+    conn = get_conn()
+    cur = conn.cursor()
+    if only_needed:
+        cur.execute("""
+            SELECT items.id, items.name, categories.name, items.needed
+            FROM items
+            LEFT JOIN categories ON items.category_id = categories.id
+            WHERE items.user_id = ? AND items.needed = 1
+            ORDER BY items.id
+        """, (user_id,))
+    else:
+        cur.execute("""
+            SELECT items.id, items.name, categories.name, items.needed
+            FROM items
+            LEFT JOIN categories ON items.category_id = categories.id
+            WHERE items.user_id = ?
+            ORDER BY items.id
+        """, (user_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
 
-# ----------------- GESTION DES CATEGORIES -----------------
-if current_tab == "categories":
-    st.title("Gestion des catégories")
+def toggle_needed(item_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT needed FROM items WHERE id = ?", (item_id,))
+    row = cur.fetchone()
+    if row:
+        new_val = 0 if row[0] == 1 else 1
+        cur.execute("UPDATE items SET needed = ? WHERE id = ?", (new_val, item_id))
+    conn.commit()
+    conn.close()
 
-    new_cat = st.text_input("Nouvelle catégorie")
-    if st.button("Ajouter"):
-        if new_cat.strip():
-            add_category(new_cat)
-            st.success("Catégorie ajoutée !")
-            st.rerun()
+def delete_item(item_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
 
-    st.subheader("Catégories existantes")
-    for cid, name in categories:
-        c1, c2 = st.columns([6, 1])
-        with c1:
-            st.write(name)
-        with c2:
-            if st.button("🗑️", key=f"del_cat_{cid}"):
-                conn = sqlite3.connect("items.db")
-                cur = conn.cursor()
-                cur.execute("DELETE FROM items WHERE category_id = ?", (cid,))
-                cur.execute("DELETE FROM categories WHERE id = ?", (cid,))
-                conn.commit()
-                conn.close()
-                st.rerun()
+def update_item_category(item_id, category_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE items SET category_id = ? WHERE id = ?", (category_id, item_id))
+    conn.commit()
+    conn.close()
 
-# ----------------- GESTION DES ITEMS -----------------
-elif current_tab == "items":
-    st.title("Gestion de liste d’items")
+# ---------- PANNEAU UTILISATEUR ----------
+def user_panel():
+    global current_user_id, exp_user_open
 
-    st.header("Ajouter un item")
+    with ui.expansion('Utilisateur', icon='person', value=exp_user_open).classes('bg-white text-black'):
+        users = get_users()
+        if not users:
+            add_user('Utilisateur 1')
+            users = get_users()
 
-    item_name = st.text_input(
-        "Nom de l’item",
-        value=st.session_state.get("item_name", "")
+        user_names = {u[1]: u[0] for u in users}
+        names_list = list(user_names.keys())
+
+        def on_user_change(e):
+            global current_user_id, exp_user_open
+            current_user_id = user_names[e.value]
+            exp_user_open = False
+            ui.open('/')
+
+        ui.select(
+            names_list,
+            value=names_list[0],
+            label='Choisir un utilisateur',
+            on_change=on_user_change
+        )
+
+        new_name_input = ui.input('Nouveau nom')
+        ui.button('Renommer', on_click=lambda: (
+            rename_user(current_user_id, new_name_input.value),
+            globals().__setitem__('exp_user_open', False),
+            ui.open('/')
+        ))
+
+        new_user_input = ui.input('Nouvel utilisateur')
+        ui.button('Créer utilisateur', on_click=lambda: (
+            add_user(new_user_input.value),
+            globals().__setitem__('exp_user_open', False),
+            ui.open('/')
+        ))
+
+# ---------- PANNEAU CATÉGORIES ----------
+def categories_panel():
+    global exp_cat_open
+
+    with ui.expansion('Catégories', icon='folder', value=exp_cat_open).classes('bg-white text-black'):
+        new_cat_input = ui.input('Nouvelle catégorie')
+        ui.button('Ajouter', on_click=lambda: (
+            add_category(new_cat_input.value),
+            globals().__setitem__('exp_cat_open', False),
+            ui.open('/')
+        ))
+
+        ui.separator()
+
+        categories = get_categories()
+        for cid, name in categories:
+            with ui.row().classes('items-center justify-between mt-1'):
+                ui.label(name)
+                ui.button('🗑️', on_click=lambda cat_id=cid: (
+                    delete_category(cat_id),
+                    globals().__setitem__('exp_cat_open', False),
+                    ui.open('/')
+                )).props('flat color=red')
+
+# ---------- PANNEAU AJOUT ITEM ----------
+def add_item_panel():
+    ui.label('Ajouter un item').classes('text-lg font-bold')
+
+    categories = get_categories()
+    cat_dict = {name: cid for cid, name in categories}
+    cat_names = list(cat_dict.keys())
+
+    item_name_input = ui.input('Nom de l’item')
+    item_cat_select = ui.select(cat_names, label='Catégorie')
+    item_needed_checkbox = ui.checkbox('J’en ai besoin')
+
+    ui.button('Ajouter item', on_click=lambda: (
+        add_item(item_name_input.value, cat_dict[item_cat_select.value], 1 if item_needed_checkbox.value else 0, current_user_id),
+        ui.open('/')
+    ))
+
+# ---------- LISTE DES ITEMS ----------
+def items_panel():
+    global tri_mode_items
+
+    ui.label('Tous les items').classes('text-lg font-bold')
+
+    ui.select(
+        ['Alphabétique', 'Ordre d’ajout', 'Catégorie', 'Besoin'],
+        value=tri_mode_items,
+        label='Trier par',
+        on_change=lambda e: (
+            globals().__setitem__('tri_mode_items', e.value),
+            ui.open('/')
+        )
     )
 
-    item_cat = st.selectbox("Catégorie", list(cat_dict.keys()))
-    item_needed = st.checkbox("J’en ai besoin")
+    categories = get_categories()
+    cat_dict = {name: cid for cid, name in categories}
+    cat_names = list(cat_dict.keys())
 
-    if st.button("Ajouter item"):
-        if item_name.strip():
-            add_item(item_name, cat_dict[item_cat], 1 if item_needed else 0, user_id)
-            st.session_state["item_name"] = ""
-            st.rerun()
+    all_items = get_items(current_user_id)
 
-    st.header("Tous les items")
-    st.write("---")
-
-    tri_mode = st.selectbox(
-        "Trier les items par",
-        ["Alphabétique", "Ordre d’ajout", "Catégorie", "Besoin"]
-    )
-
-    all_items = get_items(user_id, only_needed=False)
-
-    if tri_mode == "Alphabétique":
+    if tri_mode_items == 'Alphabétique':
         all_items = sorted(all_items, key=lambda x: x[1].lower())
-    elif tri_mode == "Catégorie":
-        all_items = sorted(all_items, key=lambda x: x[2].lower())
-    elif tri_mode == "Besoin":
+    elif tri_mode_items == 'Catégorie':
+        all_items = sorted(all_items, key=lambda x: (x[2] or '').lower())
+    elif tri_mode_items == 'Besoin':
         all_items = sorted(all_items, key=lambda x: x[3], reverse=True)
 
     for iid, name, cat, needed in all_items:
-        st.markdown('<div class="item-card">', unsafe_allow_html=True)
+        with ui.row().classes('items-center justify-between bg-gray-100 rounded-lg px-3 py-2 mt-2'):
+            ui.label(name).classes('font-bold')
 
-        col1, col2, col3, col4 = st.columns([5, 2, 3, 1])
+            ui.button('✔️' if needed else '❌',
+                      on_click=lambda item_id=iid: (
+                          toggle_needed(item_id),
+                          ui.open('/')
+                      )).props('flat color=white')
 
-        with col1:
-            st.markdown(f'<div class="item-name">{name}</div>', unsafe_allow_html=True)
+            ui.select(
+                cat_names,
+                value=cat or (cat_names[0] if cat_names else None),
+                on_change=lambda e, item_id=iid: (
+                    update_item_category(item_id, cat_dict[e.value]),
+                    ui.open('/')
+                )
+            ).classes('w-32')
 
-        with col2:
-            if st.button("✔️" if needed else "❌", key=f"toggle_{iid}"):
-                toggle_needed(iid)
-                st.rerun()
+            ui.button('🗑️',
+                      on_click=lambda item_id=iid: (
+                          delete_item(item_id),
+                          ui.open('/')
+                      )).props('flat color=red')
 
-        with col3:
-            new_cat = st.selectbox(
-                "",
-                list(cat_dict.keys()),
-                index=list(cat_dict.keys()).index(cat),
-                key=f"cat_select_{iid}"
-            )
-            if new_cat != cat:
-                update_item_category(iid, cat_dict[new_cat])
-                st.rerun()
+# ---------- BESOINS ----------
+def needs_panel():
+    global tri_mode_needs
 
-        with col4:
-            if st.button("🗑️", key=f"del_{iid}"):
-                delete_item(iid)
-                st.rerun()
+    ui.label('Besoins').classes('text-lg font-bold')
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ----------------- BESOINS PAR CATEGORIE -----------------
-elif current_tab == "besoins":
-    st.title("Besoins par catégorie")
-
-    tri_mode = st.selectbox(
-        "Mode de tri",
-        ["Alphabétique", "Ordre d’ajout"]
+    ui.select(
+        ['Alphabétique', 'Ordre d’ajout'],
+        value=tri_mode_needs,
+        label='Trier par',
+        on_change=lambda e: (
+            globals().__setitem__('tri_mode_needs', e.value),
+            ui.open('/')
+        )
     )
 
-    needed_items = get_items(user_id, only_needed=True)
+    needed_items = get_items(current_user_id, only_needed=True)
 
     grouped = {}
     for iid, name, cat, needed in needed_items:
-        grouped.setdefault(cat, []).append((iid, name))
+        grouped.setdefault(cat or 'Sans catégorie', []).append((iid, name))
 
     if not grouped:
-        st.info("Aucun item marqué comme 'Besoin'.")
-    else:
-        for cat, items in grouped.items():
-            st.subheader(f"📂 {cat}")
+        ui.label("Aucun item marqué comme besoin.")
+        return
 
-            if tri_mode == "Alphabétique":
-                items = sorted(items, key=lambda x: x[1])
+    for cat, items in grouped.items():
+        ui.label(f'📂 {cat}').classes('text-lg font-bold mt-3')
 
-            for iid, name in items:
+        if tri_mode_needs == 'Alphabétique':
+            items = sorted(items, key=lambda x: x[1])
 
-                # ---- X À GAUCHE, NOM À DROITE ----
-                col_x, col_name = st.columns([1, 6])
+        for iid, name in items:
+            with ui.row().classes('items-center gap-3 mt-1'):
+                ui.button('❌',
+                          on_click=lambda item_id=iid: (
+                              toggle_needed(item_id),
+                              ui.open('/')
+                          )).props('flat color=red')
+                ui.label(name).classes('font-bold')
 
-                with col_x:
-                    if st.button("❌", key=f"need_toggle_{iid}"):
-                        toggle_needed(iid)
-                        st.rerun()
+# ---------- NAVIGATION BAS ----------
+def bottom_nav():
+    global current_tab
 
-                with col_name:
-                    st.write(f"**{name}**")
+    with ui.row().classes('fixed bottom-0 left-0 w-full justify-around bg-gray-800 text-white py-2 border-t border-gray-700'):
+        ui.button('📝 Items', on_click=lambda: (
+            globals().__setitem__('current_tab', 'items'),
+            ui.open('/')
+        )).props('flat color=white')
+
+        ui.button('❤️ Besoins', on_click=lambda: (
+            globals().__setitem__('current_tab', 'besoins'),
+            ui.open('/')
+        )).props('flat color=white')
+
+        ui.button('📂 Catégories', on_click=lambda: (
+            globals().__setitem__('current_tab', 'categories'),
+            ui.open('/')
+        )).props('flat color=white')
+
+# ---------- PAGE PRINCIPALE ----------
+@ui.page('/')
+def main_page():
+
+    with ui.row().classes('w-full justify-center mt-4'):
+        # Colonne gauche
+        with ui.column().classes('w-full max-w-sm bg-white text-black p-4 rounded-lg shadow-md'):
+            user_panel()
+            categories_panel()
+
+        # Colonne droite
+        with ui.column().classes('w-full max-w-sm bg-white text-black p-4 rounded-lg shadow-md ml-4'):
+            add_item_panel()
+            ui.separator()
+            if current_tab == 'items':
+                items_panel()
+            elif current_tab == 'besoins':
+                needs_panel()
+            elif current_tab == 'categories':
+                categories_panel()
+
+    bottom_nav()
+
+# ---------- LANCEMENT ----------
+ui.run(title='Liste d’achats', reload=False)
