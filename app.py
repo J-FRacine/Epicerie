@@ -165,7 +165,8 @@ def update_item_category(item_id, category_id):
 def user_panel():
     global current_user_id, exp_user_open
 
-    with ui.expansion('Utilisateur', icon='person', value=exp_user_open).classes('bg-white text-black'):
+    with ui.expansion('Utilisateur', icon='person', value=exp_user_open).classes('bg-white text-black w-full'):
+        with ui.column().classes('w-full'):
         users = get_users()
         if not users:
             add_user('Utilisateur 1')
