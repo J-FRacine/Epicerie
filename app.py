@@ -288,7 +288,7 @@ def items_panel():
                     update_item_category(item_id, cat_dict[e.value]),
                     ui.open('/')
                 )
-            ).classes('w-32')
+            ).classes('w-full')
 
             ui.button('🗑️',
                       on_click=lambda item_id=iid: (
