@@ -185,7 +185,7 @@ def user_panel():
             value=names_list[0],
             label='Choisir un utilisateur',
             on_change=on_user_change
-        ).classes('w-48')
+        ).classes('w-full')
 
         new_name_input = ui.input('Nouveau nom')
         ui.button('Renommer', on_click=lambda: (
@@ -234,7 +234,7 @@ def add_item_panel():
     cat_names = list(cat_dict.keys())
 
     item_name_input = ui.input('Nom de l’item')
-    item_cat_select = ui.select(cat_names, label='Catégorie').classes('w-48')
+    item_cat_select = ui.select(cat_names, label='Catégorie').classes('w-full')
     item_needed_checkbox = ui.checkbox('J’en ai besoin')
 
     ui.button('Ajouter item', on_click=lambda: (
